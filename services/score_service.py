@@ -4,21 +4,9 @@ def calculate_unified_risk_score(
     ocr_score: float = 0,
     sandbox_score: float = 0,
     graph_score: float = 0,
+    active_layers: list[str] = None,
 ) -> dict:
-    """
-    Combines risk scores from all 5 layers into one unified score.
-    Weights reflect how strong/reliable each signal is, based on
-    what we found during testing:
-    - Email (Layer 1): highest weight - most reliable, real ML metrics (98% accuracy)
-    - Website/typosquat (Layer 2): strong, well-tested rule-based signal
-    - OCR (Layer 3): moderate - inherits Layer 1's reliability, but has known
-      out-of-distribution issues on non-email documents
-    - Sandbox (Layer 4): moderate - good at redirect-cloaking specifically,
-      not a general malicious-URL scanner
-    - Graph (Layer 5): supporting signal - strengthens confidence when a
-      campaign pattern is detected, but rarely used alone
-    """
-    weights = {
+    all_weights = {
         "email": 0.30,
         "website": 0.25,
         "ocr": 0.15,
@@ -26,14 +14,27 @@ def calculate_unified_risk_score(
         "graph": 0.10,
     }
 
-    weighted_total = (
-        email_score * weights["email"]
-        + website_score * weights["website"]
-        + ocr_score * weights["ocr"]
-        + sandbox_score * weights["sandbox"]
-        + graph_score * weights["graph"]
-    )
+    scores = {
+        "email": email_score,
+        "website": website_score,
+        "ocr": ocr_score,
+        "sandbox": sandbox_score,
+        "graph": graph_score,
+    }
 
+    # If not explicitly told which layers ran, infer it: a layer is "active"
+    # if it has a non-zero score OR was explicitly passed
+    if active_layers is None:
+        active_layers = [k for k, v in scores.items() if v > 0] or ["email"]
+
+    # Redistribute weights proportionally across only the active layers
+    active_weight_sum = sum(all_weights[k] for k in active_layers)
+    normalized_weights = {
+        k: (all_weights[k] / active_weight_sum if k in active_layers else 0)
+        for k in all_weights
+    }
+
+    weighted_total = sum(scores[k] * normalized_weights[k] for k in scores)
     final_score = round(weighted_total, 2)
 
     if final_score >= 70:
@@ -46,12 +47,7 @@ def calculate_unified_risk_score(
     return {
         "final_risk_score": final_score,
         "verdict": verdict,
-        "breakdown": {
-            "email_contribution": round(email_score * weights["email"], 2),
-            "website_contribution": round(website_score * weights["website"], 2),
-            "ocr_contribution": round(ocr_score * weights["ocr"], 2),
-            "sandbox_contribution": round(sandbox_score * weights["sandbox"], 2),
-            "graph_contribution": round(graph_score * weights["graph"], 2),
-        },
-        "weights_used": weights
+        "breakdown": {f"{k}_contribution": round(scores[k] * normalized_weights[k], 2) for k in scores},
+        "weights_used": normalized_weights,
+        "active_layers": active_layers,
     }

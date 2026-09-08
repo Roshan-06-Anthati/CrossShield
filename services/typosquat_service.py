@@ -30,6 +30,8 @@ def similarity_ratio(a: str, b: str) -> float:
 
 def check_typosquatting(domain: str) -> dict:
     domain = domain.lower().strip()
+    if domain.startswith("www."):
+        domain = domain[4:]
     normalized = normalize_domain(domain)
 
     best_match = None

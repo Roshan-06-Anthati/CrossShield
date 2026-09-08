@@ -3,8 +3,16 @@ from pydantic import BaseModel
 from routers import website, attachment, sandbox, graph, score
 from services.email_service import analyze_email_text
 from routers import website, attachment, sandbox, graph, score, scan
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Fraud Detection Platform")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class EmailRequest(BaseModel):
     text: str

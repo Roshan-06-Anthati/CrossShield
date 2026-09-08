@@ -46,12 +46,24 @@ def full_email_scan(email_text: str) -> dict:
         )
 
     # Calculate unified score
+    # unified = calculate_unified_risk_score(
+    #     email_score=email_result["risk_score"],
+    #     website_score=website_score,
+    #     ocr_score=0,
+    #     sandbox_score=sandbox_score,
+    #     graph_score=0
+    # )
+    active_layers = ["email"]
+    if urls:
+        active_layers.extend(["website", "sandbox"])
+
     unified = calculate_unified_risk_score(
         email_score=email_result["risk_score"],
         website_score=website_score,
         ocr_score=0,
         sandbox_score=sandbox_score,
-        graph_score=0
+        graph_score=0,
+        active_layers=active_layers
     )
 
     return {
