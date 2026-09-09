@@ -80,7 +80,7 @@ Weights reflect relative signal reliability established during testing — email
 - **OCR:** Tesseract, PyMuPDF
 - **Browser automation:** Playwright
 - **Graph analysis:** NetworkX
-- **Frontend:** Next.js *(in progress)*
+- **Frontend:** Next.js, Tailwind CSS
 
 ## Setup
 
@@ -119,6 +119,14 @@ uvicorn main:app --reload
 ```
 API docs available at `http://127.0.0.1:8000/docs`
 
+### Run the frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Dashboard available at `http://localhost:3000`. Supports two modes: pasting raw email text, or uploading a PDF attachment.
+
 ## API Endpoints
 
 | Endpoint | Method | Description |
@@ -132,6 +140,18 @@ API docs available at `http://127.0.0.1:8000/docs`
 | `/api/score/calculate` | POST | Combine layer scores into a unified verdict |
 | `/api/scan/email` | POST | Full pipeline: email → all applicable layers → unified score |
 
+## Testing & Real Issues Found
+
+Each layer was stress-tested against real inputs (not just synthetic examples), which surfaced three concrete bugs — fixed and re-verified rather than left in place:
+
+1. **Leetspeak bypass in Layer 2** — `paypa1-secure-verify.tk` (digit `1` instead of letter `l`) initially scored only 30% risk, missing the PayPal impersonation entirely. Fixed by normalizing common character substitutions (`0→o`, `1→l`, `3→e`, etc.) before comparison. Score for that exact domain improved from 30% to 90%.
+
+2. **`www.` prefix false positive in Layer 2** — `www.google.com` was flagged as "closely resembling but not matching" `google.com`, since the raw strings differ. Fixed by stripping the `www.` prefix before comparison. This also mirrors an earlier, separately-discovered instance of the same bug pattern in Layer 4 (see below), rather than being copy-pasted from that fix.
+
+3. **Weight dilution in the unified score** — a clear-cut scam email with no URL (classic "inheritance fund" wording) was independently classified as 79.66% phishing by Layer 1, but the *unified* score came out to only 23.9% ("Low Risk"), because the scoring formula applied Layer 1's fixed 30% weight regardless of whether other layers had anything to contribute. Fixed by dynamically redistributing weights across only the layers that actually ran for a given input; the same email now correctly scores 79.66% overall.
+
+Layer 4 (sandboxing) went through a similar iteration earlier: an initial version counted every network request as a "redirect" (falsely flagging Google's homepage), then a corrected version still flagged Microsoft's real `www.` redirect and a legitimate bank's use of the word "account" — both fixed by requiring genuine cross-domain redirects and treating keywords as corroborating evidence only, not a standalone signal.
+
 ## Known Limitations & Future Work
 
 - **No known-malicious-URL database integration** (e.g., Google Safe Browsing, VirusTotal) — Layer 4 detects a specific technique (redirect cloaking), not general URL reputation
@@ -139,12 +159,14 @@ API docs available at `http://127.0.0.1:8000/docs`
 - **No homoglyph (Unicode lookalike) detection** — current normalization handles leetspeak substitutions but not visually-identical Unicode characters from different scripts
 - **In-memory graph** — Layer 5's graph resets on server restart; would need persistent storage (database-backed graph) for production use
 - **OCR layer's classification accuracy is bounded by Layer 1's training data** — reliable on email-like text, not general documents
-- **Frontend dashboard** — in progress
+- **Layer 4 does not yet capture a screenshot of the sandboxed page** — would let a user visually verify a suspicious page instead of relying solely on the automated score; identified as a good next addition but not yet built
+- **No automated test suite** — layers were validated through extensive manual testing (documented above) rather than `pytest`-based unit tests; adding these would make regressions easier to catch automatically
+- **No deployment** — currently runs locally only; a live-hosted version (e.g., Render + Vercel) has not been set up
 
 ## Project Status
 
-Backend: complete and tested across all 5 layers, individually and via the orchestration endpoint.
-Frontend: in progress.
+Backend: complete — all 5 layers built, individually tested, and validated end-to-end through the orchestration endpoint.
+Frontend: complete — supports both email text and PDF attachment scanning, with results displayed in real time.
 
 ## Disclosure
 
