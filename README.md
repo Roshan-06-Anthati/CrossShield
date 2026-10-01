@@ -2,6 +2,39 @@
 
 A 5-layer fraud detection system that analyzes emails, URLs, and PDF attachments for phishing and fraud indicators, combining results into a single unified risk score.
 
+## Live Demo
+
+Backend deployed at: **https://crossshield.onrender.com** ([API docs](https://crossshield.onrender.com/docs))
+
+Layers 1 (email classification), 2 (typosquatting), 3 (OCR), and 5 (graph correlation) run live on this deployment. **Layer 4 (URL sandboxing)** requires a real headless browser with OS-level dependencies that aren't reliably available on free-tier hosting — it is fully functional when run locally (see Quick Start below), but is skipped in the hosted demo. This is a hosting-environment constraint, not a code issue; the fix would be a custom Docker image with Chromium's system dependencies pre-installed.
+
+## Quick Start (run locally — recommended for full functionality, including Layer 4)
+
+```bash
+git clone https://github.com/Roshan-06-Anthati/CrossShield.git
+cd CrossShield
+
+python -m venv venv
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # Mac/Linux
+
+pip install -r requirements.txt
+playwright install chromium
+
+uvicorn main:app --reload
+```
+Backend runs at `http://127.0.0.1:8000` (docs at `/docs`). Trained model files are included in the repo, so no retraining is needed to run the app.
+
+In a second terminal:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Dashboard runs at `http://localhost:3000`.
+
+Tesseract OCR must be installed separately (not a pip package) for Layer 3/OCR to work — see the Setup section below for OS-specific instructions.
+
 ## What it does
 
 CrossShield takes a suspicious email, URL, or PDF attachment and runs it through multiple independent detection layers, each targeting a different fraud technique. Rather than relying on one signal, it correlates findings across layers — and across scans — to catch coordinated fraud campaigns that a single check would miss.
